@@ -1,5 +1,7 @@
 # ticketbench-infra
 
+[![CI](https://github.com/ryczek02/ticketbench-infra/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ryczek02/ticketbench-infra/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/github/license/ryczek02/ticketbench-infra)](LICENSE)
+
 Docker Compose stack, observability configuration, benchmark matrices and
 Ansible playbooks for ticketbench. Part of
 [ryczek02/ticketbench](https://github.com/ryczek02/ticketbench).
