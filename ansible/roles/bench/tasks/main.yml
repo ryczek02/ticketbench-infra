@@ -1,0 +1,44 @@
+- name: Run the benchmark matrix
+  ansible.builtin.command: >-
+    docker compose run --rm tbench matrix --config config/{{ tb_matrix }} --out results/{{ tb_run_name }}
+  args:
+    chdir: "{{ tb_dir }}"
+  environment:
+    TB_VERSION: "{{ tb_version }}"
+    TB_UID: "{{ ansible_user_uid }}"
+    TB_GID: "{{ ansible_user_gid }}"
+  vars:
+    tb_run_name: "ansible-{{ ansible_date_time.iso8601_basic_short }}"
+  register: tb_run
+  changed_when: true
+
+- name: Find the newest result directory
+  ansible.builtin.find:
+    paths: "{{ tb_dir }}/results"
+    file_type: directory
+    patterns: "ansible-*"
+  register: tb_dirs
+
+- name: Generate the report files next to the results
+  vars:
+    tb_latest: "{{ (tb_dirs.files | sort(attribute='mtime') | last).path | basename }}"
+  ansible.builtin.command: docker compose run --rm tbench report results/{{ tb_latest }} --out results/{{ tb_latest }}/report
+  args:
+    chdir: "{{ tb_dir }}"
+  environment:
+    TB_VERSION: "{{ tb_version }}"
+    TB_UID: "{{ ansible_user_uid }}"
+    TB_GID: "{{ ansible_user_gid }}"
+  register: tb_report
+  changed_when: true
+
+- name: Show the hypothesis checks
+  ansible.builtin.debug:
+    var: tb_report.stdout_lines
+
+- name: Copy results back to the controller
+  ansible.posix.synchronize:
+    mode: pull
+    src: "{{ tb_dir }}/results/"
+    dest: "{{ tb_results_local }}/"
+  when: inventory_hostname != 'localhost'

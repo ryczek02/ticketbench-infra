@@ -1,0 +1,70 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  # Re-run the end-to-end smoke test every Monday against the latest images.
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker compose config -q
+      - run: docker compose -f docker-compose.yml -f docker-compose.dev.yml config -q
+      - run: bash -n scripts/bench.sh
+      - name: grafana dashboard is valid JSON
+        run: python3 -m json.tool grafana/dashboards/ticketbench.json > /dev/null
+
+  ansible-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: pipx install ansible-lint && pipx inject ansible-lint ansible
+      - run: ansible-galaxy collection install -r ansible/requirements.yml
+      - run: ansible-lint
+        working-directory: ansible
+
+  # Provision the runner with Ansible, start the stack from GHCR images and
+  # run the smoke matrix through the containerized CLI.
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [validate, ansible-lint]
+    steps:
+      - uses: actions/checkout@v5
+      - run: pipx install ansible-core
+      - run: ansible-galaxy collection install -r ansible/requirements.yml
+      - name: site.yml (docker already present, so only the stack starts)
+        working-directory: ansible
+        run: ansible-playbook site.yml
+      - name: bench.yml with config/smoke.yaml
+        working-directory: ansible
+        run: ansible-playbook bench.yml -e tb_matrix=smoke.yaml
+      - name: check results
+        run: |
+          dir=$(ls -d ~/ticketbench/results/ansible-* | tail -1)
+          test "$(wc -l < "$dir/scenarios.csv")" -gt 100
+          test "$(wc -l < "$dir/errors.csv")" -eq 1
+          grep -q HOneVerdict "$dir/report/macros.tex"
+          echo "results in $dir"
+      - if: always()
+        run: docker compose logs --no-color > compose.log
+        working-directory: /home/runner/ticketbench
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: e2e-results
+          path: |
+            ~/ticketbench/results
+            ~/ticketbench/compose.log
+      - name: teardown.yml
+        if: always()
+        working-directory: ansible
+        run: ansible-playbook teardown.yml

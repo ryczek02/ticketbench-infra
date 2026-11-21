@@ -1,0 +1,24 @@
+# Full matrix used for the report.
+seed: 42
+sizes: [500000, 1000000, 10000000]
+stores: [postgres, mariadb, mongo, valkey]
+scenarios: all          # 24 CRUD scenarios + 3 JSON scenarios
+repetitions: 5
+warmup: 1
+timeout: 60s
+index_modes: [off, on]
+explain: true
+load:
+  workers: 4
+  batch_size: 5000
+contention:
+  clients: [1, 10, 100, 1000]
+  hot_tickets: 500
+  rounds: 3
+  strategies: [all]
+  trace_ratio: 0.01
+overhead:
+  enabled: true
+  size: 500000
+  scenarios: [R1, R2, R4, U1, U4, C4]
+  repetitions: 30

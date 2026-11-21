@@ -1,0 +1,5 @@
+- name: Provision Docker and start ticketbench
+  hosts: all
+  roles:
+    - docker
+    - ticketbench

@@ -1,0 +1,42 @@
+- name: Check for an existing Docker engine
+  ansible.builtin.command: docker version --format '{{ "{{" }}.Server.Version{{ "}}" }}'
+  register: docker_present
+  changed_when: false
+  failed_when: false
+
+- name: Install Docker Engine and the compose plugin (Debian family)
+  when:
+    - tb_install_docker | bool
+    - docker_present.rc != 0
+    - ansible_os_family == "Debian"
+  become: true
+  block:
+    - name: Install prerequisites
+      ansible.builtin.apt:
+        name: [ca-certificates, curl]
+        update_cache: true
+    - name: Add the Docker apt key
+      ansible.builtin.get_url:
+        url: "https://download.docker.com/linux/{{ ansible_distribution | lower }}/gpg"
+        dest: /etc/apt/keyrings/docker.asc
+        mode: "0644"
+    - name: Add the Docker apt repository
+      ansible.builtin.apt_repository:
+        repo: >-
+          deb [arch={{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }} signed-by=/etc/apt/keyrings/docker.asc]
+          https://download.docker.com/linux/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} stable
+        filename: docker
+    - name: Install Docker packages
+      ansible.builtin.apt:
+        name: [docker-ce, docker-ce-cli, containerd.io, docker-buildx-plugin, docker-compose-plugin]
+        update_cache: true
+    - name: Let the user run docker
+      ansible.builtin.user:
+        name: "{{ item }}"
+        groups: docker
+        append: true
+      loop: "{{ docker_users }}"
+
+- name: Fail when Docker is still missing
+  ansible.builtin.command: docker compose version
+  changed_when: false

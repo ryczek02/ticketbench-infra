@@ -1,0 +1,17 @@
+# Build images from sibling checkouts instead of pulling them from GHCR:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build --wait
+x-build: &build
+  context: ../services
+services:
+  store-postgres:
+    build: { <<: *build, args: { SERVICE: store-postgres, VERSION: dev } }
+  store-mariadb:
+    build: { <<: *build, args: { SERVICE: store-mariadb, VERSION: dev } }
+  store-mongo:
+    build: { <<: *build, args: { SERVICE: store-mongo, VERSION: dev } }
+  store-valkey:
+    build: { <<: *build, args: { SERVICE: store-valkey, VERSION: dev } }
+  bench-runner:
+    build: { <<: *build, args: { SERVICE: bench-runner, VERSION: dev } }
+  tbench:
+    build: { context: ../cli, args: { VERSION: dev } }

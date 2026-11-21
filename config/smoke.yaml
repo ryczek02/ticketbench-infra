@@ -1,0 +1,17 @@
+# Small run for CI and for checking a fresh setup (about a minute).
+seed: 42
+sizes: [20000]
+stores: [postgres, mariadb, mongo, valkey]
+scenarios: all
+repetitions: 2
+warmup: 1
+timeout: 30s
+index_modes: [off, on]
+explain: true
+contention:
+  clients: [1, 16]
+  hot_tickets: 100
+  rounds: 1
+  strategies: [all]
+overhead:
+  enabled: false

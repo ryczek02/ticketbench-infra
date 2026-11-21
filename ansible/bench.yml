@@ -1,0 +1,4 @@
+- name: Run the benchmark and collect results
+  hosts: all
+  roles:
+    - bench

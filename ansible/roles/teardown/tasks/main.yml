@@ -1,0 +1,5 @@
+- name: Stop the stack and remove volumes
+  ansible.builtin.command: docker compose down -v --remove-orphans
+  args:
+    chdir: "{{ tb_dir }}"
+  changed_when: true

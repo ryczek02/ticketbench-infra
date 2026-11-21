@@ -1,0 +1,4 @@
+- name: Remove the ticketbench stack
+  hosts: all
+  roles:
+    - teardown

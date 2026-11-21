@@ -1,0 +1,6 @@
+tb_version: latest
+tb_dir: "{{ ansible_env.HOME }}/ticketbench"
+# Matrix file from config/ to run: smoke.yaml (about a minute) or matrix.yaml (full).
+tb_matrix: smoke.yaml
+tb_results_local: "{{ playbook_dir }}/../results/ansible"
+tb_install_docker: true

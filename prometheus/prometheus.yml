@@ -1,0 +1,9 @@
+global:
+  scrape_interval: 15s
+# Metrics arrive through the OTLP receiver (--web.enable-otlp-receiver),
+# pushed by the OpenTelemetry Collector.
+otlp:
+  promote_resource_attributes: [service.name, service.namespace]
+scrape_configs:
+  - job_name: prometheus
+    static_configs: [{ targets: ["localhost:9090"] }]
