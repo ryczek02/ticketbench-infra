@@ -1,0 +1,19 @@
+# Several minutes of continuous load for the Grafana dashboard and Jaeger
+# (presentation / demo). Results are not used in the report.
+seed: 42
+sizes: [200000]
+stores: [postgres, mariadb, mongo, valkey]
+scenarios: all
+repetitions: 40
+warmup: 1
+timeout: 30s
+index_modes: [off, on]
+explain: false
+contention:
+  clients: [1, 10, 100, 1000]
+  hot_tickets: 500
+  rounds: 3
+  strategies: [all]
+  trace_ratio: 0.01
+overhead:
+  enabled: false
