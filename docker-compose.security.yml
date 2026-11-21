@@ -1,0 +1,107 @@
+# Security experiment: TLS on every database and least-privilege users.
+#   docker compose -f docker-compose.yml -f docker-compose.security.yml up -d --wait
+# Uses its own volumes, so the main matrix setup stays untouched.
+
+x-store-security: &store-security
+  TB_PROFILES: role,tls,tls_role
+  TB_TLS_CA: /certs/ca.crt
+
+services:
+  certs:
+    image: alpine:3.20
+    command: ["sh", "/security/gen-certs.sh"]
+    volumes:
+      - certs:/certs
+      - ./security:/security:ro
+
+  postgres:
+    command: >
+      postgres -c max_connections=1200 -c shared_buffers=1GB -c effective_cache_size=2GB
+      -c work_mem=16MB -c maintenance_work_mem=512MB -c max_wal_size=4GB
+      -c random_page_cost=1.1 -c jit=off
+      -c ssl=on -c ssl_cert_file=/certs/server.crt -c ssl_key_file=/certs/server.key
+    volumes:
+      - pg-sec-data:/var/lib/postgresql/data
+      - certs:/certs:ro
+      - ./security/postgres-app-role.sql:/docker-entrypoint-initdb.d/10-app-role.sql:ro
+    depends_on:
+      certs: { condition: service_completed_successfully }
+
+  mariadb:
+    command: >
+      --max-connections=1200 --innodb-buffer-pool-size=1G --innodb-log-file-size=512M
+      --max-allowed-packet=64M --thread-cache-size=200
+      --ssl-cert=/certs/server.crt --ssl-key=/certs/server.key --ssl-ca=/certs/ca.crt
+    volumes:
+      - maria-sec-data:/var/lib/mysql
+      - certs:/certs:ro
+      - ./security/mariadb-app-user.sql:/docker-entrypoint-initdb.d/10-app-user.sql:ro
+    depends_on:
+      certs: { condition: service_completed_successfully }
+
+  mongo:
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+    command: ["--replSet", "rs0", "--bind_ip_all", "--wiredTigerCacheSizeGB", "1",
+              "--keyFile", "/certs/mongo.key",
+              "--tlsMode", "allowTLS", "--tlsCertificateKeyFile", "/certs/server.pem",
+              "--tlsCAFile", "/certs/ca.crt", "--tlsAllowConnectionsWithoutCertificates"]
+    volumes:
+      - mongo-sec-data:/data/db
+      - certs:/certs:ro
+      - ./security/mongo-app-user.js:/docker-entrypoint-initdb.d/10-app-user.js:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "-u", "root", "-p", "root", "--authenticationDatabase", "admin", "--eval",
+             "try { rs.status().ok } catch (e) { rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'mongo:27017'}]}).ok }"]
+      interval: 3s
+      retries: 60
+    depends_on:
+      certs: { condition: service_completed_successfully }
+
+  valkey:
+    command: ["valkey-server", "/etc/valkey/valkey.conf"]
+    volumes:
+      - certs:/certs:ro
+      - ./security/valkey.conf:/etc/valkey/valkey.conf:ro
+    depends_on:
+      certs: { condition: service_completed_successfully }
+
+  store-postgres:
+    environment:
+      <<: *store-security
+      TB_POSTGRES_DSN_ROLE: postgres://tb_app:tb_app@postgres:5432/ticketbench?sslmode=disable
+      TB_POSTGRES_DSN_TLS: postgres://ticketbench:ticketbench@postgres:5432/ticketbench?sslmode=verify-full&sslrootcert=/certs/ca.crt
+      TB_POSTGRES_DSN_TLS_ROLE: postgres://tb_app:tb_app@postgres:5432/ticketbench?sslmode=verify-full&sslrootcert=/certs/ca.crt
+    volumes: ["certs:/certs:ro"]
+
+  store-mariadb:
+    environment:
+      <<: *store-security
+      TB_MARIADB_DSN_ROLE: tb_app:tb_app@tcp(mariadb:3306)/ticketbench
+      TB_MARIADB_DSN_TLS: ticketbench:ticketbench@tcp(mariadb:3306)/ticketbench?tls=tb
+      TB_MARIADB_DSN_TLS_ROLE: tb_app:tb_app@tcp(mariadb:3306)/ticketbench?tls=tb
+    volumes: ["certs:/certs:ro"]
+
+  store-mongo:
+    environment:
+      <<: *store-security
+      TB_MONGO_URI: mongodb://root:root@mongo:27017/?replicaSet=rs0&authSource=admin
+      TB_MONGO_URI_ROLE: mongodb://tb_app:tb_app@mongo:27017/?replicaSet=rs0&authSource=admin
+      TB_MONGO_URI_TLS: mongodb://root:root@mongo:27017/?replicaSet=rs0&authSource=admin&tls=true&tlsCAFile=/certs/ca.crt
+      TB_MONGO_URI_TLS_ROLE: mongodb://tb_app:tb_app@mongo:27017/?replicaSet=rs0&authSource=admin&tls=true&tlsCAFile=/certs/ca.crt
+    volumes: ["certs:/certs:ro"]
+
+  store-valkey:
+    environment:
+      <<: *store-security
+      TB_VALKEY_ADDR_ROLE: redis://tbapp:tb_app@valkey:6379
+      TB_VALKEY_ADDR_TLS: rediss://valkey:6380
+      TB_VALKEY_ADDR_TLS_ROLE: rediss://tbapp:tb_app@valkey:6380
+    volumes: ["certs:/certs:ro"]
+
+volumes:
+  certs:
+  pg-sec-data:
+  maria-sec-data:
+  mongo-sec-data:

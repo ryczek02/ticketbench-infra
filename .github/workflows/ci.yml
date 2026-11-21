@@ -19,6 +19,8 @@ jobs:
       - uses: actions/checkout@v5
       - run: docker compose config -q
       - run: docker compose -f docker-compose.yml -f docker-compose.dev.yml config -q
+      - run: docker compose -f docker-compose.yml -f docker-compose.security.yml config -q
+      - run: shellcheck security/gen-certs.sh
       - run: bash -n scripts/bench.sh
       - name: grafana dashboard is valid JSON
         run: python3 -m json.tool grafana/dashboards/ticketbench.json > /dev/null
@@ -49,7 +51,7 @@ jobs:
         run: ansible-playbook bench.yml -e tb_matrix=smoke.yaml
       - name: check results
         run: |
-          dir=$(ls -d ~/ticketbench/results/ansible-* | tail -1)
+          dir=$(find ~/ticketbench/results -maxdepth 1 -type d -name 'ansible-*' | sort | tail -1)
           test "$(wc -l < "$dir/scenarios.csv")" -gt 100
           test "$(wc -l < "$dir/errors.csv")" -eq 1
           grep -q HOneVerdict "$dir/report/macros.tex"

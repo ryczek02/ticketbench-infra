@@ -1,0 +1,15 @@
+# Security experiment: the same CRUD scenarios and the contention test through
+# four connection profiles. Needs docker-compose.security.yml.
+seed: 42
+sizes: [1000000]
+stores: [postgres, mariadb, mongo, valkey]
+main: false
+security:
+  enabled: true
+  profiles: [base, role, tls, tls_role]
+  scenarios: all
+  repetitions: 5
+  warmup: 1
+  clients: [1, 100]
+  hot_tickets: 500
+  rounds: 3

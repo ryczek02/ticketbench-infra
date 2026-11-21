@@ -51,6 +51,28 @@ Docker Desktop at least 10 GB.
 `config/smoke.yaml` uses 20 thousand tickets and runs in about a minute. CI
 uses it.
 
+## Security experiment
+
+`docker-compose.security.yml` turns on TLS for all four databases (own CA,
+generated on first start by the `certs` container) and creates
+least-privilege application users. It uses separate volumes, so the main
+setup is not touched.
+
+| Database | Application user | TLS |
+|---|---|---|
+| PostgreSQL | role `tb_app`: SELECT, INSERT, UPDATE, DELETE through default privileges | `ssl=on`, clients use `verify-full` |
+| MariaDB | `tb_app`: SELECT, INSERT, UPDATE, DELETE on `ticketbench.*` | `--ssl-cert`, clients verify the CA |
+| MongoDB | auth with a keyfile, `tb_app` with a custom role: find, insert, update, remove | `allowTLS` |
+| Valkey | ACL user `tbapp`: model key prefixes only, no `@admin` or `@dangerous` | TLS port 6380 |
+
+```
+docker compose -f docker-compose.yml -f docker-compose.security.yml up -d --wait
+tbench matrix --config config/security.yaml
+```
+
+The stores load data as the admin user and then run every scenario and the
+contention test through the profiles `base`, `role`, `tls` and `tls_role`.
+
 ## Observability
 
 Every result row carries the trace id of its segment. Open
