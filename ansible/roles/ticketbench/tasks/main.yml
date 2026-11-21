@@ -42,9 +42,9 @@
     TB_VERSION: "{{ tb_version }}"
     TB_UID: "{{ ansible_user_uid }}"
     TB_GID: "{{ ansible_user_gid }}"
-  register: tb_ping
+  register: ticketbench_ping
   changed_when: false
 
 - name: Show store versions
   ansible.builtin.debug:
-    var: tb_ping.stdout_lines
+    var: ticketbench_ping.stdout_lines
